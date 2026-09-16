@@ -22,17 +22,17 @@ public class AdminController {
 
     //Uptime Endpoint
     @GetMapping({"/api/v1/uptime", "/api/v1/admin/uptime"})
-    public Map<String, Object> getUptime() {
-        long uptimeMillis = System.currentTimeMillis() - startTime;
-        Map<String, Object> response = new HashMap<>();
+    public Map<String,Object> getUptime() {
+        long uptimeMillis= System.currentTimeMillis() - startTime;
+        Map<String,Object>response =new HashMap<>();
         response.put("uptimeMillis", uptimeMillis);
-        response.put("uptimeSeconds", uptimeMillis / 1000);
+        response.put("uptimeSeconds",uptimeMillis / 1000);
         return response;
     }
     // Statistics Endpoint
     @GetMapping({"/api/v1/stats", "/api/v1/global/stats"})
     public Map<String, Object> getStats() {
-        Map<String, Object> stats = new HashMap<>();
+        Map<String, Object>stats=new HashMap<>();
         stats.put("totalRequests", requestCount.get());
         stats.put("activeThreads", Thread.activeCount());
         return stats;
