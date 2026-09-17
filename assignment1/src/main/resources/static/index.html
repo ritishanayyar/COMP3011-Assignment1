@@ -3,31 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <title>Speech to Text</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 60px auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #fafafa;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: #555;
+        }
+
+        button {
+            padding: 10px 18px;
+            margin: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            border: 1px solid #aaa;
+            border-radius: 5px;
+            background-color: white;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        #output {
+            margin-top: 10px;
+            padding: 15px;
+            min-height: 60px;
+            text-align: left;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+    </style>
 </head>
+
 <body>
 
-    <h1>Speech to Text App</h1>
+    <h1>Speech to Text</h1>
+
     <p id="status">Status: Ready</p>
 
     <button id="startBtn">Start Recording</button>
     <button id="stopBtn" disabled>Stop Recording</button>
 
-    <h3>Transcription:</h3>
-    <p id="output" style="border: 1px solid #ccc; padding: 10px; min-height: 50px;"></p>
+    <h3>Transcription</h3>
+
+    <p id="output"></p>
 
     <script>
         let mediaRecorder;
         let audioChunks = [];
 
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const statusText = document.getElementById('status');
-        const outputBox = document.getElementById('output');
+        const startBtn = document.getElementById("startBtn");
+        const stopBtn = document.getElementById("stopBtn");
+        const statusText = document.getElementById("status");
+        const outputBox = document.getElementById("output");
 
         startBtn.onclick = async () => {
             audioChunks = [];
+
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true
+                });
+
                 mediaRecorder = new MediaRecorder(stream);
 
                 mediaRecorder.ondataavailable = (event) => {
@@ -36,21 +87,27 @@
 
                 mediaRecorder.onstop = async () => {
                     statusText.innerText = "Uploading and transcribing...";
-                    
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+                    const audioBlob = new Blob(audioChunks, {
+                        type: "audio/webm"
+                    });
+
                     const formData = new FormData();
-                    formData.append('audio', audioBlob);
+                    formData.append("audio", audioBlob);
 
                     try {
-                        const response = await fetch('/api/transcribe', {
-                            method: 'POST',
+                        const response = await fetch("/api/transcribe", {
+                            method: "POST",
                             body: formData
                         });
                         const resultText = await response.text();
+
                         outputBox.innerText = resultText;
                         statusText.innerText = "Done!";
+
                     } catch (err) {
-                        outputBox.innerText = "Error: " + err;
+                        outputBox.innerText =
+                            "Something went wrong while transcribing.";
                         statusText.innerText = "Failed";
                     }
                 };
@@ -60,14 +117,18 @@
                 stopBtn.disabled = false;
 
             } catch (err) {
-                alert("Microphone error: " + err);
+                statusText.innerText = "Microphone access failed.";
+                outputBox.innerText =
+                    "Please allow microphone access and try again.";
             }
         };
         stopBtn.onclick = () => {
             mediaRecorder.stop();
+
             startBtn.disabled = false;
             stopBtn.disabled = true;
         };
     </script>
+
 </body>
 </html>
