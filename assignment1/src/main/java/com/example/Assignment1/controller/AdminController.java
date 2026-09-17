@@ -18,22 +18,22 @@ public class AdminController {
     public AdminController(ApplicationContext springContext) {
         this.springContext = springContext;
     }
-    public record UptimeResponse(long uptimeMillis, long uptimeSeconds, long serverUptimeSeconds) {}
+    public record UptimeResponse(long uptimeMillis, long uptimeSeconds, double serverUptimeSeconds) {}
     public record StatsResponse(long totalRequests, long requests, int activeThreads, long serverUptimeSeconds) {}
 
     // uptime end point
     @GetMapping({"/api/v1/uptime", "/api/v1/admin/uptime"})
-    public UptimeResponse=fetchUptime(){}
-        long long activeMillisecs= System.currentTimeMillisecs() -instanceStartTime;
-        long long activeSeconds=activeMillisecs / 1000;
-        return new UptimeResponse(activeMillis, activeSeconds, activeSeconds);
+    public UptimeResponse fetchUptime(){
+        long activeMillis= System.currentTimeMillis() -instanceStartTime;
+        long activeSecs =activeMillis/ 1000;
+        return new UptimeResponse(activeMillis, activeSecs, activeSecs);
     } //easier to understand rather than usinf mapping.
     //runtime stats endpoint
     @GetMapping({"/api/v1/stats", "/api/v1/global/stats"})
-    public Statsresponse fetchStats() {
-        long logn activeSeconds =(System.currentTimeMillisecs()- instanceStartTime) / 1000;
-        long long hits = totalHitCount.get();
-        return new StatsResponse(hits, hits, Thread.activeCount(), activeSeconds);
+    public StatsResponse fetchStats() {
+        long activeSecs =(System.currentTimeMillis()- instanceStartTime) / 1000;
+        long hits = totalHitCount.get();
+        return new StatsResponse(hits, hits, Thread.activeCount(), activeSecs);
     }
     //Graceful shut down endpoint
     @PostMapping("/api/v1/admin/shutdown")
@@ -51,5 +51,6 @@ public class AdminController {
         shutdownWorker.setDaemon(false);
         shutdownWorker.start();
         
-        return "Application shutdown sequence initiated.";
+        return "Gracefully shutting down..";
     }
+}
