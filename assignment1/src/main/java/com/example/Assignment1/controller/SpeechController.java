@@ -9,9 +9,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.multipart.MultipartFile;
+import com.example.assignment1.service.StatisticsService;
 
 @RestController
 public class SpeechController {
+    private final StatisticsService statisticsService;
+    public SpeechController(StatisticsService statisticsService){
+        this.statisticsService = statisticsService;
+    }
     @GetMapping("/api/hello")
     public String testEndpoint() {
         return "Speech controller is working!";
@@ -40,10 +45,10 @@ public class SpeechController {
                 .body(body)
                 .retrieve()
                 .body(String.class);
+                statisticsService.addTokens(150L,50L); // in order to update the token amounts
             return response; // Returns the JSON text response from OpenAI
             
         } catch (Exception e) {
             return "Transcription failed: " + e.getMessage();
         }
-    }
 }
