@@ -6,5 +6,12 @@ spring:
       max-file-size: 25MB
       max-request-size: 25MB
 
+server:
+  tomcat:
+    threads:
+      max: 250
+      min-spare: 20
+    accept-count: 100
+
 openai:
   api-key: ${OPENAI_API_KEY:your_fallback_key_here}

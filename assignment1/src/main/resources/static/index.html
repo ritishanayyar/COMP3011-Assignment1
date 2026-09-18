@@ -1,112 +1,148 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Speech to Text App</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 700px;
-            margin: 60px auto;
-            padding: 20px;
-            text-align: center;
-            background-color: #fafafa;
-        }
-        h1 {
-            margin-bottom: 10px;
-        }
-        p {
-            color: #555;
-        }
-        button {
-            padding: 10px 18px;
-            margin: 8px;
-            font-size: 15px;
-             cursor: pointer;
-            border: 1px solid #aaa;
-            border-radius: 5px;
-            background-color: white;
-        }
-        button:disabled {
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-        #output {
-            margin-top: 10px;
-            padding: 15px;
-            min-height: 60px;
-            text-align: left;
-            background-color: white;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>Speech to Text App</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    max-width: 700px;
+    margin: 60px auto;
+    padding: 20px;
+    text-align: center;
+    background-color: #fafafa;
+}
+h1 {margin-bottom: 10px;
+}
+p { color: #555;
+}
+button {
+    padding: 10px 18px;
+    margin: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    border: 1px solid #aaa;
+    border-radius: 5px;
+    background-color: white;
+}
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+#output {
+    margin-top: 10px;
+    padding: 15px;
+    min-height: 60px;
+    text-align: left;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+#output.error {
+    border-color: #c0392b;
+    color: #c0392b;
+    background-color: #fdecea;
+}
+</style>
 </head>
 <body>
 
-    <h1>Speech to Text App</h1>
-    <p id="status">Status: Ready</p>
+<h1>Speech to Text App</h1>
+<p id="status">Status: Ready</p>
 <button id="startBtn">Start Recording</button>
-    <button id="stopBtn" disabled>Stop Recording</button>
+<button id="stopBtn" disabled>Stop Recording</button>
 
-    <h3>Transcription</h3>
-    <p id="output"></p>
+<h3>Transcription</h3>
+<p id="output"></p>
 
-    <script>
-        let mediaRecorder;
-        let audioChunks = [];
-
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const statusText = document.getElementById('status');
-        const outputBox = document.getElementById('output');
-
-        startBtn.onclick =async () => { //starts recording when start is clicked
-            audioChunks = [];
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data);
-                };
-                mediaRecorder.onstop = async () => { //sends recorded audio to backend
-    statusText.innerText = "Uploading and transcribing...";
-
-    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-    const formData = new FormData();
-    // give it a filename WITH an extension — OpenAI needs this to detect format
-    formData.append('audio', audioBlob, 'recording.webm');
-
+<script>
+let mediaRecorder;
+let audioChunks = [];
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const statusText = document.getElementById('status');
+const outputBox = document.getElementById('output');
+// resets the page back to ready for a new recording
+function resetToReady() {
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    statusText.innerText = 'Status: Ready';
+}
+function showError(message) {
+    outputBox.innerText = message;
+    outputBox.classList.add('error');
+    statusText.innerText = 'Status: Failed';
+}
+function showTranscript(text) {
+    outputBox.innerText = text;
+    outputBox.classList.remove('error');
+    statusText.innerText = 'Status: Done!';
+}
+startBtn.onclick = async () => {
+    audioChunks = [];
+    outputBox.classList.remove('error');
+    let stream;
     try {
-        const response = await fetch('/api/transcribe', {
-            method: 'POST',
-            body: formData
-        });
-        const result = await response.json();
-        if (response.ok) { //displaying the transcription or error msg
-            outputBox.innerText = result.message;
-            statusText.innerText = "Done!";
-        } else {
-            outputBox.innerText = "Error: " + result.error;
-            statusText.innerText = "Failed";
-        }
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
-        outputBox.innerText = "Error: " + err;
-        statusText.innerText = "Failed";
+        showError('Microphone access failed: ' + err.message);
+        return;
     }
-};
-                mediaRecorder.start();
-                statusText.innerText = "Recording... Speak now.";startBtn.disabled = true;stopBtn.disabled = false;
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+            audioChunks.push(event.data);
+        }
+    };
+    mediaRecorder.onstop = async () => {
+        // stop the mic track too so the browser's recording indicator turns off
+        stream.getTracks().forEach(track => track.stop());
+        // lock both buttons while the request is oging on
+        startBtn.disabled = true;
+        stopBtn.disabled = true;
+        statusText.innerText = 'Status: Uploading and transcribing...';
 
-            } catch (err) {
-                statusText.innerText = "Microphone access failed.";
-                alert("Microphone error: " + err);
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+
+        try {
+            const response = await fetch('/api/transcribe', {
+                method: 'POST',
+                body: formData
+            });
+            let result;
+            try {
+                result = await response.json();
+            } catch (parseErr) {
+                showError('Server returned an unreadable response.');
+                resetToReady();
+                return;
             }
-        };
-        stopBtn.onclick = ()=> { //stop recording
-            mediaRecorder.stop(); startBtn.disabled = false; stopBtn.disabled = true;
-        };
-    </script>
+            if (response.ok) {
+                showTranscript(result.message);
+            } else {
+                showError('Error: ' + (result.message || 'Transcription failed.'));
+            }
+        } catch (networkErr) {
+            showError('Network error: could not reach the server.');
+        } finally {
+            resetToReady();
+        }
+    };
+
+    mediaRecorder.start();
+    statusText.innerText = 'Status: Recording... Speak now.';
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+};
+
+stopBtn.onclick = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    stopBtn.disabled = true;
+};
+</script>
 </body>
 </html>
