@@ -1,54 +1,52 @@
 package com.example.assignment1.controller;
 
-import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.multipart.MultipartFile;
 import com.example.assignment1.service.StatisticsService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
 
 @RestController
 public class SpeechController {
-    private final StatisticsService statisticsService;
-    public SpeechController(StatisticsService statisticsService){
-        this.statisticsService = statisticsService;
-    }
-    @GetMapping("/api/hello")
-    public String testEndpoint() {
-        return "Speech controller is working!";
-    }
 
-    @PostMapping("/api/transcribe")
-    public String transcribe(@RequestParam("audio") MultipartFile audio) {
+    private final StatisticsService statsService;
+    private final ObjectMapper mapper = new ObjectMapper();
+    private final RestClient restClient = RestClient.create();
+
+    public SpeechController(StatisticsService statsService) {
+        this.statsService = statsService;
+    }
+    @PostMapping("/api/transcribe") //endpoint for uploading the audio and comvert to text
+    public ResponseEntity<?> handleAudio(@RequestParam("audio") MultipartFile file) {
         try {
-            //read the API key from the termina;'s environment var'
-            String apiKey = System.getenv("OPENAI_API_KEY");
-            if (apiKey == null || apiKey.isEmpty()) {
-                return "Error: OPENAI_API_KEY environment variable is not set.";
-            }
-            // Creating Spring's RestClient to talk to OpenAI
-            RestClient restClient = RestClient.create();
+            String apiKey = System.getenv("OPENAI_API_KEY"); //gets the api keu
+            MultiValueMap<String, Object> payload = new LinkedMultiValueMap<>();
+            payload.add("file", file.getResource());
+            payload.add("model", "gpt-4o-mini-transcribe");
 
-            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            body.add("file", audio.getResource());
-            body.add("model", "gpt-4o-mini-transcribe"); 
+            String response = restClient.post() //audio to openAI
+                    .uri("https://api.openai.com/v1/audio/transcriptions")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .body(payload)
+                    .retrieve()
+                    .body(String.class);
+            JsonNode root = mapper.readTree(response);
+            String transcribedText = root.get("text").asText();
 
-            //Send POST request with multipart form data
-            String response = restClient.post()
-                .uri("https://api.openai.com/v1/audio/transcriptions")
-                .header("Authorization", "Bearer " + apiKey)
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(body)
-                .retrieve()
-                .body(String.class);
-                statisticsService.addTokens(150L,50L); // in order to update the token amounts
-            return response; // Returns the JSON text response from OpenAI
-            
+            JsonNode usage = root.get("usage");
+            long inputTokens = usage != null ? usage.get("input_tokens").asLong() : 0;
+            long outputTokens = usage != null ? usage.get("output_tokens").asLong() : 0;
+            statsService.addTokens(inputTokens, outputTokens); //update global token stats
+
+            return ResponseEntity.ok(Map.of("message", transcribedText));
+
         } catch (Exception e) {
-            return "Transcription failed: " + e.getMessage();
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
+    }
 }

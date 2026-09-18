@@ -16,7 +16,7 @@ public class AdminController {
 
     private final ApplicationContext springContext;
     private final Instant serverStartTime=Instant.now();
-    private final StatisticsService statisticsService;
+    private final StatisticsService statisticsService;//getting our inputs and output tokens
 
     public AdminController(ApplicationContext springContext, StatisticsService statisticsService) {
         this.springContext = springContext;
