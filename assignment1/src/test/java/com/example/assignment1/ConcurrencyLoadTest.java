@@ -33,64 +33,47 @@ class ConcurrencyLoadTest {
     @MockitoBean
     private SpeechToTextClient speechToText;
     @Test
-    void handlesConcurrentRequests() throws Exception {
-        when(speechToText.transcribe(any() ,any())) //faking the STT response
-                .thenReturn(new TranscriptionResult("test text", 10,2));
-            int numberOfRequests = 250;
-
-        ExecutorService executor= Executors.newFixedThreadPool(50);
-
-        CountDownLatch start =new CountDownLatch(1);
-        CountDownLatch finish = new CountDownLatch(numberOfRequests);
-        AtomicInteger successful = new AtomicInteger();
-
-        RestClient client =RestClient.builder()
-                .baseUrl("http://localhost:" +port)
-                .build();
-
-        for (int i =0; i< numberOfRequests;i++) {
-            executor.submit(()-> {
-                try {
-                    start.await();
-                    HttpStatusCode status = sendRequest(client);
-                    if (status.is2xxSuccessful()){
-                        successful.incrementAndGet();}
-                } catch (Exception e) {
-                    //request failed hre
-                } finally {
-                    finish.countDown();
+void handlesConcurrentRequests() throws Exception {
+    when(speechToText.transcribe(any(), any()))
+            .thenAnswer(invocation ->{
+                Thread.sleep(50);
+                return new TranscriptionResult("test text", 10,2);
+            });
+    int numberOfRequests= 250; //handling 250 reqs concurrently
+    ExecutorService executor =Executors.newFixedThreadPool(numberOfRequests);
+            
+    CountDownLatch start =new CountDownLatch(1);
+    CountDownLatch finish = new CountDownLatch(numberOfRequests); //makes all requests start with each other so concurrency caqn be tested properly.
+    AtomicInteger successful= new AtomicInteger();
+    RestClient client = RestClient.builder()
+            .baseUrl("http://localhost:"+ port)
+            .build();
+            
+    for (int i= 0; i<numberOfRequests;i++) {
+        executor.submit(()->{
+            try {start.await();
+            HttpStatusCode status = sendRequest(client);
+             if (status.is2xxSuccessful()) {
+                    successful.incrementAndGet();
                 }
-            });}
-        long startTime = System.currentTimeMillis();
-        start.countDown();
 
-        boolean completed = finish.await(20, TimeUnit.SECONDS);
-        long timeTaken = System.currentTimeMillis()- startTime;
-        executor.shutdown();
-
-        assertTrue(completed);
-        assertEquals(numberOfRequests, successful.get());
-        assertTrue(timeTaken < 10000);
-    }
-    private HttpStatusCode sendRequest(RestClient client) {
-
-        MultiValueMap<String,Object> body =new LinkedMultiValueMap<>();
-        body.add("audio", new ByteArrayResource(
-                "fake audio".getBytes()
-        ) {
-            @Override
-            public String getFilename() {
-                return "recording.webm";
+            } catch (Exception e) {
+                // Request failed
+            } finally {
+                finish.countDown();
             }
         });
-        ResponseEntity<String> response = client
-                .post()
-                .uri("/api/transcribe")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(body)
-                .retrieve()
-                .toEntity(String.class);
-
-        return response.getStatusCode();
     }
+
+    long startTime = System.currentTimeMillis();
+
+    start.countDown();
+    boolean completed =finish.await(20, TimeUnit.SECONDS);
+    long timeTaken = System.currentTimeMillis()- startTime;
+
+    executor.shutdown();
+    assertTrue(completed);
+    assertEquals(numberOfRequests, successful.get());
+    assertTrue(timeTaken <10000);
+}
 }
