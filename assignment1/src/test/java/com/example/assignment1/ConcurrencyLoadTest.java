@@ -76,4 +76,28 @@ void handlesConcurrentRequests() throws Exception {
     assertEquals(numberOfRequests, successful.get());
     assertTrue(timeTaken <10000);
 }
+private HttpStatusCode sendRequest(RestClient client) {
+
+    MultiValueMap<String, Object> body =
+            new LinkedMultiValueMap<>();
+
+    body.add("audio", new ByteArrayResource(
+            "fake audio".getBytes()
+    ) {
+        @Override
+        public String getFilename() {
+            return "recording.webm";
+        }
+    });
+
+    ResponseEntity<String> response = client
+            .post()
+            .uri("/api/transcribe")
+            .contentType(MediaType.MULTIPART_FORM_DATA)
+            .body(body)
+            .retrieve()
+            .toEntity(String.class);
+
+    return response.getStatusCode();
+}
 }
